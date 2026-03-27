@@ -5,7 +5,7 @@
   "author": {
     "name": "Luke Hagar",
     "email": "lukeslakemail@gmail.com",
-    "url": "https://LukeHagar.com/"
+    "url": "https://LukasParke.com/"
   },
   "license": "MIT",
   "main": "dist/index.js",
@@ -29,12 +29,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/LukeHagar/prettier-plugin-openapi"
+    "url": "https://github.com/LukasParke/prettier-plugin-openapi"
   },
   "bugs": {
-    "url": "https://github.com/lukehagar/prettier-plugin-openapi/issues"
+    "url": "https://github.com/LukasParke/prettier-plugin-openapi/issues"
   },
-  "homepage": "https://github.com/lukehagar/prettier-plugin-openapi#readme",
+  "homepage": "https://github.com/LukasParke/prettier-plugin-openapi#readme",
   "scripts": {
     "build": "rollup -c && tsc --emitDeclarationOnly",
     "dev": "rollup -c --watch",
