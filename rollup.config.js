@@ -8,7 +8,7 @@ export default [
     {
         input: 'src/index.ts',
         plugins: [resolve(), commonjs(), typescript()],
-        external: ['prettier', 'js-yaml'],
+        external: ['prettier', 'js-yaml', 'yaml'],
         output: {
             file: 'dist/index.js',
             format: 'cjs',
@@ -28,7 +28,7 @@ export default [
             commonjs(),
             typescript(),
         ],
-        external: ['prettier/standalone', 'prettier/plugins/babel', 'js-yaml'],
+        external: ['prettier/standalone', 'prettier/plugins/babel', 'js-yaml', 'yaml'],
         output: {
             file: 'dist/browser.js',
             format: 'esm',

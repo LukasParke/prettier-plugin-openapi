@@ -120,7 +120,6 @@ openapi: 3.0.0`;
     expect(parser).toBeDefined();
     expect(printer).toBeDefined();
 
-    // Unquoted ISO-8601 scalars are parsed as Date by js-yaml; must not become {} after format.
     const inputYaml = `openapi: 3.0.0
 info:
   title: Test API

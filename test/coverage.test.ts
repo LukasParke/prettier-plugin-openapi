@@ -454,7 +454,7 @@ description: External documentation`;
       expect(result).toBeDefined();
     });
 
-    it('should skip markdown formatting when formatMarkdown is false', () => {
+    it('should skip markdown formatting when openApiFormatMarkdown is false', () => {
       const printer = printers?.['openapi-ast'];
       expect(printer).toBeDefined();
 
@@ -473,10 +473,10 @@ description: External documentation`;
       };
 
       // @ts-expect-error We are testing edge cases
-      const result = printer?.print({ getNode: () => testData }, { tabWidth: 2, formatMarkdown: false }, () => '');
+      const result = printer?.print({ getNode: () => testData }, { tabWidth: 2, openApiFormatMarkdown: false }, () => '');
       expect(result).toBeDefined();
       if (result && typeof result === 'string') {
-        // When formatMarkdown is false, extra spaces should remain
+        // When openApiFormatMarkdown is false, extra spaces should remain
         expect(result).toContain('description');
       }
     });

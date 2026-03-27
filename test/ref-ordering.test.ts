@@ -96,16 +96,14 @@ describe("Reference ($ref) Ordering Tests", () => {
       const responsesIndex = resultString.indexOf("responses");
       const xSailpointIndex = resultString.indexOf("x-sailpoint-userLevels");
 
-      // Verify operation key order: operationId -> summary -> tags -> description -> security -> parameters -> responses
+      // Verify operation key order: ... -> security -> x-sailpoint-userLevels -> ... -> parameters -> responses
       expect(operationIdIndex).toBeLessThan(summaryIndex);
       expect(summaryIndex).toBeLessThan(tagsIndex);
       expect(tagsIndex).toBeLessThan(descriptionIndex);
       expect(descriptionIndex).toBeLessThan(securityIndex);
-      expect(securityIndex).toBeLessThan(parametersIndex);
+      expect(securityIndex).toBeLessThan(xSailpointIndex);
+      expect(xSailpointIndex).toBeLessThan(parametersIndex);
       expect(parametersIndex).toBeLessThan(responsesIndex);
-
-      // Custom extensions should come after all standard keys
-      expect(responsesIndex).toBeLessThan(xSailpointIndex);
     });
 
     it("should sort parameters array with $ref items first", () => {
@@ -227,10 +225,10 @@ describe("Reference ($ref) Ordering Tests", () => {
       // Response codes should be sorted numerically: 200, 400, 401, 500
       const responsesSection = resultString.substring(resultString.indexOf("responses:"));
 
-      const code200Index = responsesSection.indexOf('"200":');
-      const code400Index = responsesSection.indexOf('"400":');
-      const code401Index = responsesSection.indexOf('"401":');
-      const code500Index = responsesSection.indexOf('"500":');
+      const code200Index = responsesSection.indexOf("'200':");
+      const code400Index = responsesSection.indexOf("'400':");
+      const code401Index = responsesSection.indexOf("'401':");
+      const code500Index = responsesSection.indexOf("'500':");
 
       expect(code200Index).toBeLessThan(code400Index);
       expect(code400Index).toBeLessThan(code401Index);
@@ -526,16 +524,14 @@ describe("Reference ($ref) Ordering Tests", () => {
       const responsesIndex = getBlock.indexOf("responses");
       const xSailpointIndex = getBlock.indexOf("x-sailpoint-userLevels");
 
-      // Verify operation key order: operationId -> summary -> tags -> description -> security -> parameters -> responses
+      // Verify operation key order: ... -> security -> x-sailpoint-userLevels -> ... -> parameters -> responses
       expect(operationIdIndex).toBeLessThan(summaryIndex);
       expect(summaryIndex).toBeLessThan(tagsIndex);
       expect(tagsIndex).toBeLessThan(descriptionIndex);
       expect(descriptionIndex).toBeLessThan(securityIndex);
-      expect(securityIndex).toBeLessThan(parametersIndex);
+      expect(securityIndex).toBeLessThan(xSailpointIndex);
+      expect(xSailpointIndex).toBeLessThan(parametersIndex);
       expect(parametersIndex).toBeLessThan(responsesIndex);
-
-      // Custom extensions should come after all standard keys
-      expect(responsesIndex).toBeLessThan(xSailpointIndex);
 
       // Verify $ref parameters come first in parameters array
       const parametersSection = getBlock.substring(getBlock.indexOf("parameters:"));

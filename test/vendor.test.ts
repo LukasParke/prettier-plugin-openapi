@@ -5,13 +5,14 @@ describe('Vendor Extension System', () => {
   it('should load vendor extensions from TS files', () => {
     const vendorExtensions = getVendorExtensions();
 
-    // Should have loaded Speakeasy and Redoc extensions
+    // Should have loaded built-in vendor extensions
     expect(vendorExtensions).toBeDefined();
     expect(typeof vendorExtensions).toBe('object');
 
     // Check if extensions were loaded
     expect(vendorExtensions['top-level']).toBeDefined();
     expect(vendorExtensions['top-level']['x-tagGroups']).toBe(13);
+    expect(vendorExtensions.operation['x-sailpoint-userLevels']).toBe(7);
   });
 
 

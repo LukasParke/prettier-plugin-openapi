@@ -73,6 +73,7 @@ describe('Key Ordering Tests', () => {
                 callbacks: {},
                 deprecated: false,
                 security: [],
+                'x-sailpoint-userLevels': ['ORG_ADMIN'],
                 servers: []
               }
             }
@@ -98,6 +99,7 @@ describe('Key Ordering Tests', () => {
       const tagsIndex = resultString.indexOf('tags');
       const deprecatedIndex = resultString.indexOf('deprecated');
       const securityIndex = resultString.indexOf('security');
+      const userLevelsIndex = resultString.indexOf('x-sailpoint-userLevels');
       const serversIndex = resultString.indexOf('servers');
       const parametersIndex = resultString.indexOf('parameters');
       const requestBodyIndex = resultString.indexOf('requestBody');
@@ -110,11 +112,58 @@ describe('Key Ordering Tests', () => {
       expect(tagsIndex).toBeLessThan(deprecatedIndex);
       expect(deprecatedIndex).toBeLessThan(descriptionIndex);
       expect(descriptionIndex).toBeLessThan(securityIndex);
-      expect(securityIndex).toBeLessThan(serversIndex);
+      expect(securityIndex).toBeLessThan(userLevelsIndex);
+      expect(userLevelsIndex).toBeLessThan(serversIndex);
       expect(serversIndex).toBeLessThan(parametersIndex);
       expect(parametersIndex).toBeLessThan(requestBodyIndex);
       expect(requestBodyIndex).toBeLessThan(responsesIndex);
       expect(responsesIndex).toBeLessThan(callbacksIndex);
+    });
+  });
+
+  describe('Request body key ordering', () => {
+    it('should order description, then required, then content (inline operation requestBody)', () => {
+      const printer = printers?.['openapi-ast'];
+      expect(printer).toBeDefined();
+
+      const testData = {
+        isOpenAPI: true,
+        format: 'yaml',
+        content: {
+          openapi: '3.0.0',
+          info: { title: 'Test API', version: '1.0.0' },
+          paths: {
+            '/items': {
+              post: {
+                operationId: 'createItem',
+                responses: { '201': { description: 'Created' } },
+                requestBody: {
+                  content: {
+                    'application/json': { schema: { type: 'object' } },
+                  },
+                  required: true,
+                  description: 'Payload to create an item',
+                },
+              },
+            },
+          },
+        },
+        originalText: '',
+      };
+
+      // @ts-expect-error mock AstPath
+      const result = printer?.print({ getNode: () => testData }, { tabWidth: 2 });
+      expect(result).toBeDefined();
+      if (!result) throw new Error('Result is undefined');
+
+      const s = result.toString();
+      const rb = s.indexOf('requestBody:');
+      const block = s.slice(rb);
+      const d = block.indexOf('description:');
+      const r = block.indexOf('required:');
+      const c = block.indexOf('content:');
+      expect(d).toBeLessThan(r);
+      expect(r).toBeLessThan(c);
     });
   });
 
@@ -269,6 +318,54 @@ describe('Key Ordering Tests', () => {
       expect(anyOfIndex).toBeLessThan(oneOfIndex);
       expect(oneOfIndex).toBeLessThan(notIndex);
       expect(notIndex).toBeLessThan(xmlIndex);
+    });
+
+    it('orders type before items for schemas under response content (schema context, not mediaType)', () => {
+      const printer = printers?.['openapi-ast'];
+      expect(printer).toBeDefined();
+
+      const testData = {
+        isOpenAPI: true,
+        format: 'yaml',
+        content: {
+          openapi: '3.0.0',
+          info: { title: 'T', version: '1' },
+          paths: {
+            '/x': {
+              get: {
+                operationId: 'getX',
+                responses: {
+                  '200': {
+                    description: 'OK',
+                    content: {
+                      'application/json': {
+                        schema: {
+                          items: { type: 'string' },
+                          type: 'array',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        originalText: '',
+      };
+
+      // @ts-expect-error mock AstPath
+      const result = printer?.print({ getNode: () => testData }, { tabWidth: 2 });
+      expect(result).toBeDefined();
+      if (!result) throw new Error('Result is undefined');
+
+      const s = result.toString();
+      const r200 = s.indexOf("'200':");
+      expect(r200).toBeGreaterThanOrEqual(0);
+      const slice = s.slice(r200, r200 + 900);
+      const typeIdx = slice.indexOf('type:');
+      const itemsIdx = slice.indexOf('items:');
+      expect(typeIdx).toBeLessThan(itemsIdx);
     });
   });
 

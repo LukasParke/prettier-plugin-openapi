@@ -299,7 +299,7 @@ export const SchemaKeys = [
     'minLength',
     'maxLength',
 
-    // Array constraints grouped together
+    // Array constraints grouped together (type/format above — keep type before items for array schemas)
     'uniqueItems',
     'minItems',
     'maxItems',
@@ -513,11 +513,11 @@ export const PathItemKeys = [
     'trace',
 ] as const;
 
-// Simple/short first
+// OpenAPI Request Body Object: description → required → content (required sits between the two when all are present).
 export const RequestBodyKeys = [
     // $ref should always be at the top, because when its included there are at most 2 other keys that are present.
     '$ref',
-    
+
     'description',
     'required',
     'content',

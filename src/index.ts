@@ -1,5 +1,14 @@
-import * as yaml from "js-yaml";
-import type { AstPath, Doc, Parser, ParserOptions, Printer, SupportLanguage } from "prettier";
+import * as jsYaml from "js-yaml";
+import { Document, Scalar, isScalar, visit } from "yaml";
+import type {
+  AstPath,
+  Doc,
+  Parser,
+  ParserOptions,
+  Printer,
+  SupportLanguage,
+  SupportOptions,
+} from "prettier";
 import { getVendorExtensions } from "./extensions/vendor-loader.js";
 
 export type PrintFn = (path: AstPath) => Doc;
@@ -39,11 +48,36 @@ interface OpenAPINode {
   format?: "json" | "yaml";
 }
 
-interface OpenAPIPluginOptions {
-  tabWidth?: number;
-  printWidth?: number;
-  formatMarkdown?: boolean; // Option to enable/disable markdown formatting (default: true)
-}
+/** Registered with Prettier so `.prettierrc` can set these without "unknown option" warnings. */
+export const options: SupportOptions = {
+  openApiFormatMarkdown: {
+    type: "boolean",
+    category: "OpenAPI",
+    default: true,
+    description: "Run Prettier's Markdown formatter on `description` and `summary` string fields.",
+  },
+  openApiSortKeys: {
+    type: "boolean",
+    category: "OpenAPI",
+    default: true,
+    description:
+      "Reorder object keys to the plugin's canonical OpenAPI order (operations, components, etc.).",
+  },
+  openApiYamlSingleQuote: {
+    type: "boolean",
+    category: "OpenAPI",
+    default: true,
+    description:
+      "In YAML output, prefer single quotes for scalars that must be quoted (numeric response keys like `'200':`, `x-` keys, etc.). Set false for double-quoted YAML. Does not use Prettier `singleQuote` (that option targets JavaScript and other languages).",
+  },
+  openApiYamlDoubleQuoteRefs: {
+    type: "boolean",
+    category: "OpenAPI",
+    default: true,
+    description:
+      "In YAML output, always emit `$ref` string values as double-quoted scalars. When false, `$ref` follows `openApiYamlSingleQuote` like other strings.",
+  },
+};
 
 // Load vendor extensions
 const vendorExtensions = getVendorExtensions();
@@ -80,8 +114,8 @@ function parseOpenAPIFile(text: string, options?: any): OpenAPINode {
   try {
     switch (format) {
       case "yaml":
-        parsed = yaml.load(text, {
-          schema: yaml.DEFAULT_SCHEMA,
+        parsed = jsYaml.load(text, {
+          schema: jsYaml.DEFAULT_SCHEMA,
         });
         break;
       case "json":
@@ -351,13 +385,12 @@ export const printers: Record<string, Printer> = {
  * This uses Prettier's actual markdown formatting implementation, ensuring
  * that markdown in OpenAPI descriptions is formatted exactly as Prettier would format it.
  */
-function formatMarkdownSync(markdown: string, options?: OpenAPIPluginOptions): string {
+function formatMarkdownSync(markdown: string, options?: ParserOptions): string {
   if (!markdown || typeof markdown !== "string") {
     return markdown;
   }
 
-  // Skip formatting if disabled
-  if (options?.formatMarkdown === false) {
+  if (options?.openApiFormatMarkdown === false) {
     return markdown;
   }
 
@@ -372,10 +405,10 @@ function formatMarkdownSync(markdown: string, options?: OpenAPIPluginOptions): s
     // Dynamic require to avoid issues during build
     const formatModule = require("./prettier-markdown/format-markdown.js");
     const formatted = formatModule.formatMarkdown(trimmed, {
-      printWidth: options?.printWidth || 80,
-      tabWidth: options?.tabWidth || 2,
+      printWidth: options?.printWidth ?? 80,
+      tabWidth: options?.tabWidth ?? 2,
       proseWrap: "preserve",
-      singleQuote: false,
+      singleQuote: options?.singleQuote ?? false,
     });
 
     return formatted;
@@ -389,7 +422,7 @@ function formatMarkdownSync(markdown: string, options?: OpenAPIPluginOptions): s
 /**
  * Recursively formats all description and summary fields that may contain markdown
  */
-function formatMarkdownFields(obj: any, options?: OpenAPIPluginOptions): any {
+function formatMarkdownFields(obj: any, options?: ParserOptions): any {
   if (typeof obj !== "object" || obj === null) {
     return obj;
   }
@@ -424,33 +457,71 @@ function formatMarkdownFields(obj: any, options?: OpenAPIPluginOptions): any {
 }
 
 /**
+ * Stringify OpenAPI as YAML. General quoted scalars follow `yamlSingleQuote` (see
+ * `openApiYamlSingleQuote`); `$ref` values can be forced double-quoted (see `openApiYamlDoubleQuoteRefs`).
+ */
+function dumpOpenApiYaml(
+  content: unknown,
+  tabWidth: number,
+  yamlSingleQuote: boolean,
+  doubleQuoteRefs: boolean,
+): string {
+  const doc = new Document(content, { aliasDuplicateObjects: false });
+
+  visit(doc, {
+    Scalar(_, node) {
+      // Force ISO-8601 timestamp strings to be double-quoted so YAML parsers
+      // don't re-interpret them as native Date objects.
+      if (typeof node.value === "string" && /^\d{4}-\d{2}-\d{2}[T ]/.test(node.value)) {
+        node.type = Scalar.QUOTE_DOUBLE;
+      }
+    },
+    Pair(_, pair) {
+      if (!doubleQuoteRefs) return;
+      const keyNode = pair.key;
+      if (!isScalar(keyNode) || keyNode.value !== "$ref") return;
+      const valNode = pair.value;
+      if (isScalar(valNode) && typeof valNode.value === "string") {
+        valNode.type = Scalar.QUOTE_DOUBLE;
+      }
+    },
+  });
+  return doc.toString({
+    indent: tabWidth,
+    lineWidth: 0,
+    singleQuote: !!yamlSingleQuote,
+  });
+}
+
+/**
  * Unified formatter that outputs in the detected format
  */
-function formatOpenAPI(
-  content: any,
-  format: "json" | "yaml",
-  options?: OpenAPIPluginOptions
-): string {
-  // Sort keys for better organization
-  const sortedContent = sortOpenAPIKeys(content);
+function formatOpenAPI(content: any, format: "json" | "yaml", options?: ParserOptions): string {
+  const sortedContent =
+    options?.openApiSortKeys === false ? content : sortOpenAPIKeys(content);
 
-  // Format markdown in description and summary fields
   const contentWithFormattedMarkdown = formatMarkdownFields(sortedContent, options);
 
   switch (format) {
     case "json":
-      return JSON.stringify(contentWithFormattedMarkdown, null, options?.tabWidth || 2);
+      return JSON.stringify(contentWithFormattedMarkdown, null, options?.tabWidth ?? 2);
     case "yaml":
-      // Format YAML with proper indentation and line breaks
-      // Use lineWidth: -1 to disable automatic line wrapping for better markdown preservation
-      return yaml.dump(contentWithFormattedMarkdown, {
-        indent: options?.tabWidth || 2,
-        lineWidth: -1, // Disable line width to preserve markdown formatting
-        noRefs: true,
-        quotingType: '"',
-        forceQuotes: false,
-      });
+      return dumpOpenApiYaml(
+        contentWithFormattedMarkdown,
+        options?.tabWidth ?? 2,
+        options?.openApiYamlSingleQuote !== false,
+        options?.openApiYamlDoubleQuoteRefs !== false,
+      );
   }
+}
+
+/**
+ * True when `path` is at or under an OpenAPI `example` or `examples` node.
+ * Payloads there are arbitrary JSON/YAML; we keep author key order (no canonical sort).
+ */
+function isPreservedExampleSubtreePath(path: string): boolean {
+  if (!path) return false;
+  return /(^|\.)(example|examples)(\[|\.|$)/.test(path);
 }
 
 function sortOpenAPIKeys(obj: any): any {
@@ -518,7 +589,8 @@ function sortOpenAPIKeysEnhanced(obj: any, path: string = ""): any {
     const sortedObjs = [];
 
     for (let i = 0; i < obj.length; i++) {
-      sortedObjs.push(sortOpenAPIKeysEnhanced(obj[i], `${path}[${i}]`));
+      const elPath = `${path}[${i}]`;
+      sortedObjs.push(sortOpenAPIKeysEnhanced(obj[i], elPath));
     }
 
     if (path === "tags") {
@@ -539,6 +611,15 @@ function sortOpenAPIKeysEnhanced(obj: any, path: string = ""): any {
     }
 
     return sortedObjs;
+  }
+
+  if (isPreservedExampleSubtreePath(path)) {
+    const preserved: any = {};
+    for (const key of Object.keys(obj)) {
+      const newPath = path ? `${path}.${key}` : key;
+      preserved[key] = sortOpenAPIKeysEnhanced(obj[key], newPath);
+    }
+    return preserved;
   }
 
   const contextKey = getContextKey(path, obj);
@@ -707,7 +788,14 @@ function isPathItemObject(obj: any): boolean {
 }
 
 function isRequestBodyObject(obj: any): boolean {
-  return obj && typeof obj === "object" && ("content" in obj || "description" in obj);
+  if (!obj || typeof obj !== "object") return false;
+  // OpenAPI Response uses headers/links; RequestBody does not.
+  if ("headers" in obj || "links" in obj) return false;
+  // Request Body Object is the only common parent of `content` + boolean `required` (OAS 3).
+  if (typeof obj.required === "boolean") return true;
+  if ("$ref" in obj) return true;
+  if ("content" in obj) return true;
+  return false;
 }
 
 function isMediaTypeObject(obj: any): boolean {
@@ -885,8 +973,13 @@ function getContextKey(path: string, obj: any): string {
 
   // Handle nested paths for operations (parameters, responses, etc.)
   if (path.includes(".parameters.") && path.split(".").length > 3) return "parameter";
+  // JSON Schema under responses/requestBody/etc. — before `.responses.` or every `...responses...` path matches "response"
+  // and `type` / `items` sort as unknown keys (items before type).
+  if (path.endsWith(".schema") || path.includes(".schema.")) return "schema";
   if (path.includes(".responses.") && path.split(".").length > 3) return "response";
   if (path.includes(".requestBody.")) return "requestBody";
+  // Inline operation request body value: paths.*.(get|post|...).requestBody (not followed by .content)
+  if (path.endsWith(".requestBody")) return "requestBody";
   if (path.includes(".headers.")) return "header";
   if (path.includes(".examples.")) return "example";
   if (path.includes(".links.")) return "link";
@@ -906,6 +999,7 @@ function getContextKey(path: string, obj: any): string {
   if (path && isOperationObject(obj)) return "operation";
   if (isParameterObject(obj)) return "parameter";
   if (isSchemaObject(obj)) return "schema";
+  if (isRequestBodyObject(obj)) return "requestBody";
   if (isResponseObject(obj)) return "response";
   if (isSecuritySchemeObject(obj)) return "securityScheme";
   if (isServerObject(obj)) return "server";
@@ -913,7 +1007,6 @@ function getContextKey(path: string, obj: any): string {
   if (isExternalDocsObject(obj)) return "externalDocs";
   if (isWebhookObject(obj)) return "webhook";
   if (isPathItemObject(obj)) return "pathItem";
-  if (isRequestBodyObject(obj)) return "requestBody";
   if (isMediaTypeObject(obj)) return "mediaType";
   if (isEncodingObject(obj)) return "encoding";
   if (isHeaderObject(obj)) return "header";

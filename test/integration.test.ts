@@ -442,7 +442,7 @@ describe('Integration Tests', () => {
         expect(result).toContain('version:');
         expect(result).toContain('get:');
         expect(result).toContain('responses:');
-        expect(result).toContain('"200":');
+        expect(result).toContain("'200':");
         expect(result).toContain('description:');
         expect(result).toContain('Success');
       }
