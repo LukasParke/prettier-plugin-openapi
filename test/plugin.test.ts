@@ -113,6 +113,54 @@ openapi: 3.0.0`;
     expect(pathsIndex).toBeGreaterThanOrEqual(0);
   });
 
+  it('preserves YAML-parsed timestamp examples (no created/modified empty objects)', () => {
+    const parser = parsers?.['openapi-parser'];
+    const printer = printers?.['openapi-ast'];
+
+    expect(parser).toBeDefined();
+    expect(printer).toBeDefined();
+
+    // Unquoted ISO-8601 scalars are parsed as Date by js-yaml; must not become {} after format.
+    const inputYaml = `openapi: 3.0.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /items:
+    get:
+      responses:
+        '200':
+          description: Ok
+          content:
+            application/json:
+              examples:
+                Sample:
+                  value:
+                    id: abc
+                    created: 2021-09-28T02:15:44.644Z
+                    modified: 2021-09-28T02:16:44.644Z
+`;
+
+    // @ts-expect-error We are mocking things here
+    const parsed = parser?.parse(inputYaml, { filepath: 'test.yaml' });
+    expect(parsed).toBeDefined();
+    expect(parsed?.isOpenAPI).toBeTrue();
+
+    // @ts-expect-error We are mocking things here
+    const result = printer?.print({ getNode: () => parsed }, { tabWidth: 2 }, () => '');
+
+    expect(result).toBeDefined();
+    if (!result) {
+      throw new Error('Result is undefined');
+    }
+
+    expect(result).not.toContain('created: {}');
+    expect(result).not.toContain('modified: {}');
+    expect(result).toContain('2021-09-28');
+    expect(result).toContain('created:');
+    expect(result).toContain('modified:');
+  });
+
   it('should format Swagger 2.0 JSON files', () => {
     const parser = parsers?.['openapi-parser'];
     const printer = printers?.['openapi-ast'];

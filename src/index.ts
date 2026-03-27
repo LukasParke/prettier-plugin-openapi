@@ -394,6 +394,10 @@ function formatMarkdownFields(obj: any, options?: OpenAPIPluginOptions): any {
     return obj;
   }
 
+  if (obj instanceof Date) {
+    return obj;
+  }
+
   if (Array.isArray(obj)) {
     return obj.map((item) => formatMarkdownFields(item, options));
   }
@@ -502,6 +506,10 @@ function sortOpenAPIKeys(obj: any): any {
 // Enhanced sorting for nested OpenAPI structures
 function sortOpenAPIKeysEnhanced(obj: any, path: string = ""): any {
   if (typeof obj !== "object" || obj === null) {
+    return obj;
+  }
+
+  if (obj instanceof Date) {
     return obj;
   }
 

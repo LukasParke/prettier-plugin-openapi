@@ -27,14 +27,16 @@ A Prettier plugin for formatting OpenAPI/Swagger JSON and YAML files with intell
 
 ## Installation
 
+This plugin has a `prettier` peer dependency and works with Prettier 3 on Node 18+.
+
 ```bash
-npm install --save-dev prettier-plugin-openapi
+npm install --save-dev prettier prettier-plugin-openapi
 # or
-pnpm add --dev prettier-plugin-openapi
+pnpm add --save-dev prettier prettier-plugin-openapi
 # or
-yarn add --dev prettier-plugin-openapi
+yarn add --dev prettier prettier-plugin-openapi
 # or
-bun add --dev prettier-plugin-openapi
+bun add --dev prettier prettier-plugin-openapi
 ```
 
 ## Usage
@@ -82,6 +84,74 @@ module.exports = {
   printWidth: 80,
 };
 ```
+
+### Repo Setup
+
+For a typical repository, add a couple of scripts so local development and CI use the same commands:
+
+**package.json**
+```json
+{
+  "scripts": {
+    "format": "prettier --write \"openapi/**/*.{yaml,yml,json}\"",
+    "format:check": "prettier --check \"openapi/**/*.{yaml,yml,json}\""
+  }
+}
+```
+
+**.prettierrc.json**
+```json
+{
+  "plugins": ["prettier-plugin-openapi"]
+}
+```
+
+Then you can run:
+
+```bash
+npm run format
+npm run format:check
+```
+
+Adjust the `openapi/**/*.{yaml,yml,json}` glob to match wherever your specs live.
+
+### GitHub Actions
+
+If you want formatting to run whenever `main` is updated and automatically push formatting fixes back to pull requests, you can use [autofix.ci](https://autofix.ci/).
+
+1. Install the [autofix.ci GitHub App](https://autofix.ci/) for your repository.
+2. Add a workflow like this:
+
+**.github/workflows/format-openapi.yml**
+```yaml
+name: Format OpenAPI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - run: npm ci
+      - run: npm run format
+
+      - uses: autofix-ci/action@7a166d7532b277f34e16238930461bf77f9d7ed8
+```
+
+This runs the same Prettier command on pushes to `main` and on pull requests, while `autofix.ci` writes any formatting changes back to the PR branch for you.
+
+If you only want CI to verify formatting instead of auto-fixing it, replace `npm run format` with `npm run format:check` and remove the `autofix-ci` step.
 
 ## Supported File Extensions
 
