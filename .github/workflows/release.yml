@@ -11,13 +11,13 @@ permissions:
   packages: write             # If you also publish GitHub Packages
   id-token: write             # Optional (for OIDC to cloud registries)
 
+concurrency:
+  group: prettier-plugin-openapi-release
+  cancel-in-progress: false
+
 jobs:
   publish-and-release:
-    # Only proceed if:
-    # 1) CI concluded successfully
-    # 2) The run was triggered by a push (not a PR)
-    # 3) The branch is main
-    # 4) The run belongs to this repository (not a fork)
+    # Same contract as other toolchain repos: release only after green CI on main (npm uses workflow_run).
     if: >
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
